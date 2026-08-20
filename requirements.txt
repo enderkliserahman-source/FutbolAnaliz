@@ -5,3 +5,5 @@ scipy
 requests
 beautifulsoup4
 openpyxl
+seaborn
+matplotlib

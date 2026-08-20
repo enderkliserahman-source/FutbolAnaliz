@@ -16,9 +16,7 @@ if "active_page" not in st.session_state:
 if "selected_match_id" not in st.session_state:
     st.session_state.selected_match_id = None
 if "my_coupon" not in st.session_state:
-    st.session_state.my_coupon = {}  # {match_id: {"match": ..., "pick": ..., "odd": ...}}
-if "saved_coupons" not in st.session_state:
-    st.session_state.saved_coupons = []
+    st.session_state.my_coupon = {}
 
 # 2. Canlı Bülten Veritabanı
 matches_db = [
@@ -64,16 +62,39 @@ matches_db = [
     }
 ]
 
-# 3. Mobil Tasarım CSS
+# 3. İstenmeyen Elementleri Gizleme & Mobil Güvenli Alan CSS
 st.markdown("""
 <style>
+    /* ÜSTTEKİ FORK, GITHUB, HEADER VE ALTTARZ TAÇ LOGOLARINI GİZLE */
+    header[data-testid="stHeader"] {
+        display: none !important;
+    }
+    footer {
+        display: none !important;
+    }
+    #MainMenu {
+        visibility: hidden !important;
+    }
+    .stDeployButton {
+        display: none !important;
+    }
+    div[class*="viewerBadge"] {
+        display: none !important;
+    }
+
+    /* Genel Sayfa ve Kaydırma Ayarları */
     html, body, [class*="css"], .stApp {
         overflow-x: hidden !important;
         background-color: #f1f5f9;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
+    
+    /* Üstten ve alttan güvenli pay bırakma */
     .block-container {
-        padding: 0.4rem 0.5rem 6rem 0.5rem !important;
+        padding-top: 1.2rem !important;
+        padding-bottom: 6.5rem !important;
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
     }
 
     /* Lig Bandı */
@@ -115,7 +136,7 @@ st.markdown("""
         font-weight: bold;
     }
 
-    /* Butonları Mobilde Ekrana Kitleme */
+    /* Yan Yana Buton Izgarası */
     div[data-testid="column"] {
         flex: 1 1 0% !important;
         min-width: 0px !important;
@@ -134,7 +155,7 @@ st.markdown("""
         border: 1px solid #cbd5e1;
     }
 
-    /* Streamlit Varsayılan Oran Butonları */
+    /* Buton Tasarımları */
     div.stButton > button {
         background: #1e3a5f !important;
         color: #ffffff !important;
@@ -148,7 +169,7 @@ st.markdown("""
         line-height: 1.1 !important;
     }
 
-    /* Alt Sabit Kupon Barı */
+    /* Alt Sabit Bar (Genişletilmiş ve Yukarı Kaldırılmış) */
     .bottom-nav {
         position: fixed;
         bottom: 0;
@@ -156,7 +177,7 @@ st.markdown("""
         width: 100%;
         background: #0f2438;
         color: white;
-        padding: 10px 14px;
+        padding: 8px 14px 14px 14px;
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -167,7 +188,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Bahis Ekle / Çıkar Fonksiyonu
+# Bahis Seçim Fonksiyonu
 def toggle_selection(match_id, match_name, pick_type, odd):
     key = f"{match_id}_{pick_type}"
     if key in st.session_state.my_coupon:
@@ -185,9 +206,9 @@ def toggle_selection(match_id, match_name, pick_type, odd):
 # ==========================================
 if st.session_state.active_page == "bulten":
     st.markdown("""
-    <div style="text-align:center; padding: 4px 0 8px 0;">
-        <h3 style="margin:0; color:#0f2438; font-weight:800;">⚽ GÜNÜN BÜLTENİ</h3>
-        <span style="font-size:0.75rem; color:#64748b;">Oranlar ve Poisson Analizi İçin Maça Dokunun</span>
+    <div style="text-align:center; padding: 4px 0 10px 0;">
+        <h3 style="margin:0; color:#0f2438; font-weight:800; font-size:1.3rem;">⚽ GÜNÜN BÜLTENİ</h3>
+        <span style="font-size:0.75rem; color:#64748b;">Oranlar ve Model Analizi İçin Maça Dokunun</span>
     </div>
     """, unsafe_allow_html=True)
 
@@ -221,14 +242,14 @@ elif st.session_state.active_page == "detay":
     st.markdown(f"""
     <div style="background:#0f2438; color:white; padding:10px; border-radius:10px; text-align:center; margin:4px 0 8px 0;">
         <div style="font-size:0.75rem; color:#94a3b8;">⏱ {match['time']} • {match['league']}</div>
-        <div style="font-size:1.1rem; font-weight:800; margin-top:2px;">{match_title}</div>
+        <div style="font-size:1.05rem; font-weight:800; margin-top:2px;">{match_title}</div>
     </div>
     """, unsafe_allow_html=True)
 
     t_oran, t_ist, t_sim = st.tabs(["📌 Oranlar", "📊 Model & xG", "🎲 Simülasyon"])
 
     with t_oran:
-        # Dinamik Kırmızı Vurgu CSS Üretici
+        # Dinamik Kırmızı Vurgu
         custom_red_css = ""
         for k in st.session_state.my_coupon.keys():
             custom_red_css += f"div.stButton > button[key='btn_{k}'] {{ background: #e63946 !important; border: 1px solid #ffccd5 !important; }}\n"
@@ -283,7 +304,7 @@ elif st.session_state.active_page == "detay":
         c_x1, c_x2 = st.columns(2)
         c_x1.metric(f"xG ({match['home']})", match['xg_home'])
         c_x2.metric(f"xG ({match['away']})", match['xg_away'])
-        st.progress(match['confidence'], text=f"Güven Endeksi: %{match['confidence']}")
+        st.progress(match['confidence'], text=f"Model Güven Endeksi: %{match['confidence']}")
 
     with t_sim:
         st.write("🎲 **Monte Carlo 10.000 Maç Simülasyonu:**")
@@ -293,7 +314,7 @@ elif st.session_state.active_page == "detay":
         c3.metric("2 (Dep)", match['mc_2'])
 
 # ==========================================
-# ALT SABİT KUPON ÇUBUĞU (HESAPLAYICI)
+# ALT SABİT KUPON BAR
 # ==========================================
 coupon_items = list(st.session_state.my_coupon.values())
 bet_count = len(coupon_items)
@@ -309,11 +330,11 @@ else:
 st.markdown(f"""
 <div class="bottom-nav">
     <div>
-        <span style="font-size:0.75rem; color:#94a3b8;">Kuponum: {bet_count} Tercih</span><br>
-        <span style="font-size:1.15rem; font-weight:800; color:#38bdf8;">Toplam Oran: {odds_str}</span>
+        <span style="font-size:0.75rem; color:#94a3b8;">Kuponum ({bet_count} Seçim)</span><br>
+        <span style="font-size:1.15rem; font-weight:800; color:#38bdf8;">Toplam: {odds_str}</span>
     </div>
-    <div style="background:#e63946; padding:6px 12px; border-radius:6px; font-weight:bold; font-size:0.82rem;">
-        Kuponu Temizle ✕
+    <div style="background:#e63946; padding:6px 12px; border-radius:6px; font-weight:bold; font-size:0.8rem; cursor:pointer;">
+        Kuponu İncele ➔
     </div>
 </div>
 """, unsafe_allow_html=True)

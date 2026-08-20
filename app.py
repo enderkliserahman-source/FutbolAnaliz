@@ -2,197 +2,286 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
+# Mobil Sayfa Ayarı
 st.set_page_config(
-    page_title="Futbol Analiz",
+    page_title="Nesine Tarzı Maç Analiz",
     page_icon="⚽",
     layout="centered",
     initial_sidebar_state="collapsed"
 )
 
-# Açık Ferah Zemin, Lacivert/Mavi Nesine/Bilyoner Tarzı CSS
+# Kupon Durumu (State) Yönetimi
+if "selected_bets" not in st.session_state:
+    st.session_state.selected_bets = {}
+
+# Özel CSS: Nesine/Bilyoner Birebir Mimarisi & Mavi/Kırmızı Tema
 st.markdown("""
 <style>
-    /* Açık Buz Mavisi / Huzurlu Zemin */
+    /* Genel Arka Plan */
     .stApp {
-        background: #f0f4f9;
-        color: #1e293b;
+        background-color: #f1f5f9;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
-    
     .block-container {
-        padding-top: 1rem;
-        padding-bottom: 4rem;
-        padding-left: 0.6rem;
-        padding-right: 0.6rem;
+        padding-top: 0.5rem;
+        padding-bottom: 5.5rem;
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
     }
 
-    /* Başlık Alanı */
-    .app-header {
+    /* Üst Maç Başlık Alanı (Koyu Gece Mavisi) */
+    .header-box {
+        background: #0f2438;
+        color: #ffffff;
+        padding: 14px 12px;
+        border-radius: 10px;
         text-align: center;
-        margin-bottom: 1rem;
+        margin-bottom: 10px;
     }
-    .app-header h2 {
-        color: #0f172a;
-        font-weight: 800;
-        font-size: 1.4rem;
-        margin-bottom: 2px;
-    }
-    .app-header p {
-        color: #2563eb;
+    .header-time {
         font-size: 0.8rem;
+        color: #94a3b8;
+        margin-bottom: 3px;
+    }
+    .header-league {
+        font-size: 0.75rem;
+        color: #38bdf8;
         font-weight: 600;
-    }
-
-    /* Maç Kartı (Temiz Beyaz & İnce Mavi Kenarlık) */
-    .match-card {
-        background: #ffffff;
-        border: 1px solid #dbeafe;
-        border-radius: 12px;
-        padding: 10px 12px 6px 12px;
-        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.06);
-    }
-
-    .card-top {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        font-size: 0.72rem;
-        color: #64748b;
         margin-bottom: 6px;
-        font-weight: 600;
+        text-transform: uppercase;
     }
-    
-    .team-title {
-        font-size: 0.95rem;
-        font-weight: 700;
-        color: #0f172a;
-        text-align: center;
-        margin-bottom: 8px;
+    .header-teams {
+        font-size: 1.15rem;
+        font-weight: 800;
+        letter-spacing: 0.3px;
     }
 
-    /* +EV Rozeti (Mavi Vurgulu) */
-    .badge-ev {
-        background: #eff6ff;
-        color: #1d4ed8;
-        border: 1px solid #bfdbfe;
-        padding: 2px 7px;
-        border-radius: 12px;
-        font-weight: 700;
-        font-size: 0.72rem;
+    /* Pazar / Kategori Şeridi */
+    .market-header {
+        background: #cfe2f3;
+        color: #0f2438;
+        font-size: 0.78rem;
+        font-weight: 800;
+        padding: 6px 10px;
+        border-radius: 6px;
+        margin-top: 10px;
+        margin-bottom: 6px;
+        text-transform: uppercase;
+        display: flex;
+        align-items: center;
+    }
+    .market-badge {
+        background: #e63946;
+        color: white;
+        font-size: 0.65rem;
+        padding: 1px 5px;
+        border-radius: 3px;
+        margin-right: 6px;
+        font-weight: bold;
     }
 
-    /* MOBİLDE SÜTUNLARIN YAN YANA KALMASINI ZORLAYAN SİHİRLİ KOD */
-    div[data-testid="column"] {
-        flex: 1 1 0% !important;
-        min-width: 0px !important;
-        padding: 0 2px !important;
-    }
+    /* Satır Düzeni & Buton Yan Yana Kilidi */
     div[data-testid="stHorizontalBlock"] {
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: nowrap !important;
-        gap: 3px !important;
+        align-items: center !important;
+        gap: 4px !important;
+        background: #ffffff;
+        padding: 6px 6px;
+        border-radius: 8px;
+        margin-bottom: 4px;
+        border: 1px solid #e2e8f0;
+    }
+    div[data-testid="column"] {
+        flex: 1 1 0% !important;
+        min-width: 0px !important;
     }
 
-    /* Lacivert/Mavi Nesine Tarzı Oran Butonları */
+    /* Bahis Etiket Başlıkları (MS 1, MS X vb.) */
+    .bet-label {
+        font-size: 0.65rem;
+        color: #64748b;
+        text-align: center;
+        font-weight: 700;
+        margin-bottom: 2px;
+        line-height: 1;
+    }
+    .market-title-col {
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: #1e293b;
+        display: flex;
+        align-items: center;
+    }
+
+    /* Buton Tasarımları (Varsayılan Koyu Mavi) */
     div.stButton > button {
-        background: #ffffff !important;
-        color: #0f172a !important;
-        border: 1px solid #cbd5e1 !important;
+        background: #1e3a5f !important;
+        color: #ffffff !important;
+        border: none !important;
         border-radius: 6px !important;
-        font-weight: 700 !important;
-        font-size: 0.75rem !important;
-        padding: 4px 1px !important;
-        line-height: 1.1 !important;
+        font-weight: 800 !important;
+        font-size: 0.88rem !important;
+        padding: 6px 2px !important;
+        min-height: 38px !important;
         width: 100% !important;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
-    }
-    
-    div.stButton > button:hover {
-        background: #1d4ed8 !important;
-        color: #ffffff !important;
-        border-color: #1d4ed8 !important;
-    }
-    
-    div.stButton > button:active {
-        background: #0f172a !important;
-        color: #ffffff !important;
     }
 
-    /* Akordiyon Menü Tasarımı */
-    .streamlit-expanderHeader {
-        background-color: #f8fafc !important;
-        color: #1e3a8a !important;
-        border: 1px solid #e2e8f0 !important;
-        border-radius: 6px !important;
-        font-size: 0.78rem !important;
-        font-weight: 600 !important;
+    /* Alt Sabit Kupon Çubuğu */
+    .bottom-bar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        background: #0f2438;
+        color: white;
+        padding: 10px 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-top: 2px solid #e63946;
+        z-index: 99999;
+        box-shadow: 0 -3px 10px rgba(0,0,0,0.2);
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Başlık
+# Üst Başlık Kartı
 st.markdown("""
-<div class="app-header">
-    <h2>⚽ FUTBOL ANALİZ</h2>
-    <p>Poisson Modeli • Değerli Oran Radarı (+EV)</p>
+<div class="header-box">
+    <div class="header-time">Bugün 20:00</div>
+    <div class="header-league">UEFA Avrupa Konferans Ligi, Playoff</div>
+    <div class="header-teams">Nordsjælland — St. Gallen</div>
 </div>
 """, unsafe_allow_html=True)
 
-# Örnek Maçlar
-matches = [
-    {
-        "id": 1, "time": "20:00", "league": "Avrupa Ligi",
-        "home": "Beşiktaş", "away": "Bodo Glimt",
-        "ms1": "2.10", "msx": "3.40", "ms2": "2.80", "ust": "1.65", "kg": "1.55",
-        "ev_pick": "MS 1 & 2.5 Üst", "ev_val": "%8.4 +EV",
-        "confidence": 72, "probs": "1: %48 | X: %26 | 2: %26"
-    },
-    {
-        "id": 2, "time": "20:00", "league": "Konferans Ligi",
-        "home": "Trabzonspor", "away": "St. Gallen",
-        "ms1": "1.75", "msx": "3.60", "ms2": "3.90", "ust": "1.70", "kg": "1.68",
-        "ev_pick": "MS 1", "ev_val": "%6.2 +EV",
-        "confidence": 68, "probs": "1: %54 | X: %24 | 2: %22"
-    },
-    {
-        "id": 3, "time": "22:00", "league": "Şampiyonlar Ligi",
-        "home": "Real Madrid", "away": "Atalanta",
-        "ms1": "1.55", "msx": "4.20", "ms2": "5.10", "ust": "1.50", "kg": "1.60",
-        "ev_pick": "2.5 Üst", "ev_val": "%11.0 +EV",
-        "confidence": 81, "probs": "1: %62 | X: %21 | 2: %17"
-    }
-]
+# Üst Sekmeler
+tab_oranlar, tab_istatistik, tab_simulasyon = st.tabs(["📌 Oranlar", "📊 Model İstatistikleri", "🎲 Monte Carlo"])
 
-for m in matches:
-    # Maç Kartı
-    st.markdown(f"""
-    <div class="match-card">
-        <div class="card-top">
-            <span>⏱ {m['time']} • {m['league']}</span>
-            <span class="badge-ev">{m['ev_val']}</span>
-        </div>
-        <div class="team-title">{m['home']} - {m['away']}</div>
-    </div>
-    """, unsafe_allow_html=True)
+# Bahis Seçim Fonksiyonu
+def toggle_bet(market, selection, odd):
+    key = f"{market}_{selection}"
+    if key in st.session_state.selected_bets:
+        del st.session_state.selected_bets[key]
+    else:
+        st.session_state.selected_bets[key] = {"market": market, "pick": selection, "odd": odd}
+
+# --- SEKME 1: NESİNE ORANLAR EKRANI ---
+with tab_oranlar:
+    # 1. Kategori: MAÇ SONUCU
+    st.markdown('<div class="market-header"><span class="market-badge">1</span> MAÇ SONUCU</div>', unsafe_allow_html=True)
     
-    # Kesin Olarak Mobilde Yan Yana 5 Oran Butonu
-    c1, c2, c3, c4, c5 = st.columns(5)
+    c_title, c1, c2, c3 = st.columns([1.6, 1, 1, 1])
+    with c_title:
+        st.markdown('<div class="market-title-col">📌 Maç Sonucu</div>', unsafe_allow_html=True)
     with c1:
-        st.button(f"1\n{m['ms1']}", key=f"ms1_{m['id']}", use_container_width=True)
+        st.markdown('<div class="bet-label">MS 1</div>', unsafe_allow_html=True)
+        btn1 = st.button("1.37", key="btn_ms1", use_container_width=True)
+        if btn1: toggle_bet("Maç Sonucu", "1", 1.37)
     with c2:
-        st.button(f"X\n{m['msx']}", key=f"msx_{m['id']}", use_container_width=True)
+        st.markdown('<div class="bet-label">MS X</div>', unsafe_allow_html=True)
+        btnX = st.button("4.36", key="btn_msx", use_container_width=True)
+        if btnX: toggle_bet("Maç Sonucu", "X", 4.36)
     with c3:
-        st.button(f"2\n{m['ms2']}", key=f"ms2_{m['id']}", use_container_width=True)
-    with c4:
-        st.button(f"Üst\n{m['ust']}", key=f"ust_{m['id']}", use_container_width=True)
-    with c5:
-        st.button(f"KG\n{m['kg']}", key=f"kg_{m['id']}", use_container_width=True)
-        
-    # Model Açılır Detay Menüsü
-    with st.expander(f"📊 Analiz: {m['home']} vs {m['away']}"):
-        st.markdown(f"**🎯 Model Tercihi:** `{m['ev_pick']}`")
-        st.progress(m['confidence'], text=f"Güven Endeksi: %{m['confidence']}")
-        st.caption(f"Dağılım: {m['probs']}")
-    
-    st.write("")
+        st.markdown('<div class="bet-label">MS 2</div>', unsafe_allow_html=True)
+        btn2 = st.button("4.59", key="btn_ms2", use_container_width=True)
+        if btn2: toggle_bet("Maç Sonucu", "2", 4.59)
+
+    # 2. Kategori: ÇİFTE ŞANS
+    st.markdown('<div class="market-header"><span class="market-badge">1</span> ÇİFTE ŞANS</div>', unsafe_allow_html=True)
+    c_cs_t, c_cs1, c_cs2, c_cs3 = st.columns([1.6, 1, 1, 1])
+    with c_cs_t:
+        st.markdown('<div class="market-title-col">📌 Çifte Şans</div>', unsafe_allow_html=True)
+    with c_cs1:
+        st.markdown('<div class="bet-label">ÇŞ 1-X</div>', unsafe_allow_html=True)
+        btn_cs1 = st.button("1.05", key="btn_cs1", use_container_width=True)
+        if btn_cs1: toggle_bet("Çifte Şans", "1-X", 1.05)
+    with c_cs2:
+        st.markdown('<div class="bet-label">ÇŞ 1-2</div>', unsafe_allow_html=True)
+        btn_cs2 = st.button("1.07", key="btn_cs2", use_container_width=True)
+        if btn_cs2: toggle_bet("Çifte Şans", "1-2", 1.07)
+    with c_cs3:
+        st.markdown('<div class="bet-label">ÇŞ X-2</div>', unsafe_allow_html=True)
+        btn_cs3 = st.button("2.17", key="btn_cs3", use_container_width=True)
+        if btn_cs3: toggle_bet("Çifte Şans", "X-2", 2.17)
+
+    # 3. Kategori: ALT / ÜST (2.5 GOL)
+    st.markdown('<div class="market-header"><span class="market-badge">1</span> TOPLAM GOL (2.5)</div>', unsafe_allow_html=True)
+    c_ou_t, c_ou1, c_ou2 = st.columns([1.6, 1.5, 1.5])
+    with c_ou_t:
+        st.markdown('<div class="market-title-col">📌 2.5 Alt/Üst</div>', unsafe_allow_html=True)
+    with c_ou1:
+        st.markdown('<div class="bet-label">Alt</div>', unsafe_allow_html=True)
+        btn_alt = st.button("2.15", key="btn_alt", use_container_width=True)
+        if btn_alt: toggle_bet("2.5 Gol", "Alt", 2.15)
+    with c_ou2:
+        st.markdown('<div class="bet-label">Üst</div>', unsafe_allow_html=True)
+        btn_ust = st.button("1.52", key="btn_ust", use_container_width=True)
+        if btn_ust: toggle_bet("2.5 Gol", "Üst", 1.52)
+
+    # 4. Kategori: KARŞILIKLI GOL
+    st.markdown('<div class="market-header"><span class="market-badge">1</span> KARŞILIKLI GOL</div>', unsafe_allow_html=True)
+    c_kg_t, c_kg1, c_kg2 = st.columns([1.6, 1.5, 1.5])
+    with c_kg_t:
+        st.markdown('<div class="market-title-col">📌 KG Var/Yok</div>', unsafe_allow_html=True)
+    with c_kg1:
+        st.markdown('<div class="bet-label">Var</div>', unsafe_allow_html=True)
+        btn_kgv = st.button("1.48", key="btn_kgv", use_container_width=True)
+        if btn_kgv: toggle_bet("KG", "Var", 1.48)
+    with c_kg2:
+        st.markdown('<div class="bet-label">Yok</div>', unsafe_allow_html=True)
+        btn_kgy = st.button("2.10", key="btn_kgy", use_container_width=True)
+        if btn_kgy: toggle_bet("KG", "Yok", 2.10)
+
+# --- SEKME 2: MODEL İSTATİSTİKLERİ ---
+with tab_istatistik:
+    st.info("🎯 **Model Tercihi:** MS 1 & 2.5 Üst (%9.4 +EV Avantajı)")
+    st.metric("Beklenen Gol (xG)", "Nordsjælland: 2.14 — St. Gallen: 0.88")
+    st.progress(74, text="Model Güven Skoru: %74")
+
+# --- SEKME 3: MONTE CARLO SİMÜLASYONU ---
+with tab_simulasyon:
+    st.write("🎲 **10.000 Maç Simülasyon Çıktısı:**")
+    sim_col1, sim_col2, sim_col3 = st.columns(3)
+    sim_col1.metric("Ev Galibiyeti", "%64.2")
+    sim_col2.metric("Beraberlik", "%20.5")
+    sim_col3.metric("Dep Galibiyeti", "%15.3")
+
+# --- SEÇİLİ KUPON CSS VURGUSU (KIRMIZI BUTON) ---
+# Tıklanan butonları anında kırmızıya çeviren dinamik CSS
+selected_css = ""
+for k in st.session_state.selected_bets.keys():
+    if k == "Maç Sonucu_1": selected_css += "div.stButton > button[key='btn_ms1'] { background: #e63946 !important; }"
+    if k == "Maç Sonucu_X": selected_css += "div.stButton > button[key='btn_msx'] { background: #e63946 !important; }"
+    if k == "Maç Sonucu_2": selected_css += "div.stButton > button[key='btn_ms2'] { background: #e63946 !important; }"
+    if k == "Çifte Şans_1-X": selected_css += "div.stButton > button[key='btn_cs1'] { background: #e63946 !important; }"
+    if k == "Çifte Şans_1-2": selected_css += "div.stButton > button[key='btn_cs2'] { background: #e63946 !important; }"
+    if k == "Çifte Şans_X-2": selected_css += "div.stButton > button[key='btn_cs3'] { background: #e63946 !important; }"
+    if k == "2.5 Gol_Alt": selected_css += "div.stButton > button[key='btn_alt'] { background: #e63946 !important; }"
+    if k == "2.5 Gol_Üst": selected_css += "div.stButton > button[key='btn_ust'] { background: #e63946 !important; }"
+    if k == "KG_Var": selected_css += "div.stButton > button[key='btn_kgv'] { background: #e63946 !important; }"
+    if k == "KG_Yok": selected_css += "div.stButton > button[key='btn_kgy'] { background: #e63946 !important; }"
+
+if selected_css:
+    st.markdown(f"<style>{selected_css}</style>", unsafe_allow_html=True)
+
+# --- ALT SABİT KUPON ÇUBUĞU (BOTTOM BAR) ---
+total_odds = 1.0
+bet_count = len(st.session_state.selected_bets)
+for b in st.session_state.selected_bets.values():
+    total_odds *= b["odd"]
+
+odds_display = f"{total_odds:.2f}" if bet_count > 0 else "0.00"
+
+st.markdown(f"""
+<div class="bottom-bar">
+    <div>
+        <span style="font-size:0.75rem; color:#94a3b8;">Kuponum ({bet_count} Maç/Tercih)</span><br>
+        <span style="font-size:1.1rem; font-weight:800; color:#38bdf8;">Oran: {odds_display}</span>
+    </div>
+    <div style="background:#e63946; padding:6px 14px; border-radius:6px; font-weight:bold; font-size:0.85rem;">
+        Kuponu İncele ➔
+    </div>
+</div>
+""", unsafe_allow_html=True)

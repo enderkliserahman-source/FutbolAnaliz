@@ -3,7 +3,7 @@ from datetime import datetime
 
 st.set_page_config(layout="centered", initial_sidebar_state="collapsed", page_title="Futbol İstişare & Analiz Masası")
 
-# Session State Başlatma
+# Session State
 if "user_preds" not in st.session_state: st.session_state.user_preds = {}
 if "user_odds" not in st.session_state: st.session_state.user_odds = {}
 if "revealed" not in st.session_state: st.session_state.revealed = {}
@@ -13,32 +13,79 @@ if "cases" not in st.session_state: st.session_state.cases = []
 
 st.markdown("""
 <style>
+    /* Üst ve Alt Boşluklar / Genel Ayarlar */
     header, footer, #MainMenu, .stDeployButton, [data-testid="stDecoration"] { display: none !important; }
-    .stApp { background: #0f172a; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    .block-container { padding-top: 1rem; padding-bottom: 3rem; }
+    .stApp { background-color: #111827 !important; color: #f9fafb !important; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    .block-container { padding-top: 0.8rem; padding-bottom: 3rem; }
     
-    .match-card {
-        background: #1e293b;
-        border: 1px solid #334155;
-        border-left: 4px solid #38bdf8;
-        padding: 12px 14px;
-        border-radius: 8px;
-        margin-bottom: 8px;
+    /* Üst Sekmeler / Buton Menü Tasarımı */
+    button[data-baseweb="tab"] {
+        background-color: #1f2937 !important;
+        color: #cbd5e1 !important;
+        border-radius: 8px 8px 0px 0px !important;
+        padding: 10px 16px !important;
+        font-weight: 600 !important;
+        font-size: 14px !important;
+        border: 1px solid #374151 !important;
+        border-bottom: none !important;
+        margin-right: 6px !important;
     }
-    .badge-session { background: #3b82f6; color: white; padding: 3px 9px; border-radius: 4px; font-size: 12px; font-weight: bold; }
-    .badge-tier { background: #0284c7; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+    button[data-baseweb="tab"][aria-selected="true"] {
+        background-color: #2563eb !important;
+        color: #ffffff !important;
+        font-weight: bold !important;
+        border-color: #3b82f6 !important;
+    }
+    div[data-testid="stTabs"] {
+        border-bottom: 2px solid #2563eb !important;
+        margin-bottom: 16px !important;
+    }
+
+    /* Maç Kartları */
+    .match-card {
+        background-color: #1f2937;
+        border: 1px solid #374151;
+        border-left: 5px solid #38bdf8;
+        padding: 14px;
+        border-radius: 10px;
+        margin-bottom: 10px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    }
+    .badge-session { background: #3b82f6; color: #ffffff; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: bold; }
+    .badge-tier { background: #0284c7; color: #ffffff; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
     
-    div[data-baseweb="select"] { background-color: #334155 !important; border-radius: 6px; }
-    div[data-baseweb="input"] { background-color: #334155 !important; border-radius: 6px; }
+    /* Form Alanları ve Etiketler */
+    label p { color: #f3f4f6 !important; font-weight: 600 !important; font-size: 13px !important; }
+    div[data-baseweb="select"] { background-color: #374151 !important; border-radius: 8px; border: 1px solid #4b5563 !important; }
+    div[data-baseweb="select"] * { color: #ffffff !important; font-weight: 500; }
+    div[data-baseweb="input"] { background-color: #374151 !important; border-radius: 8px; border: 1px solid #4b5563 !important; }
     div[data-baseweb="input"] input { color: #ffffff !important; font-size: 14px; }
+    
+    /* Butonlar */
     div.stButton > button {
         background: #2563eb !important;
         color: #ffffff !important;
         font-weight: bold !important;
         border: none !important;
-        border-radius: 6px !important;
+        border-radius: 8px !important;
+        padding: 8px 12px !important;
         width: 100% !important;
+        transition: 0.2s;
     }
+    div.stButton > button:hover {
+        background: #1d4ed8 !important;
+    }
+
+    /* Expander Başlığı */
+    .streamlit-expanderHeader {
+        background-color: #1f2937 !important;
+        color: #f3f4f6 !important;
+        border-radius: 8px !important;
+        border: 1px solid #374151 !important;
+        font-weight: 600 !important;
+    }
+
+    /* Sohbet Baloncukları */
     .chat-bubble-user {
         background: #1e3a8a;
         padding: 8px 12px;
@@ -46,19 +93,12 @@ st.markdown("""
         margin-bottom: 6px;
         font-size: 13px;
         border: 1px solid #3b82f6;
-    }
-    .chat-bubble-system {
-        background: #1e293b;
-        padding: 8px 12px;
-        border-radius: 8px 8px 8px 0px;
-        margin-bottom: 6px;
-        font-size: 13px;
-        border-left: 3px solid #38bdf8;
+        color: #ffffff;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# HAZIR TAHMİN SEÇENEKLERİ
+# HAZIR MARKET SEÇENEKLERİ
 PRESET_OPTIONS = [
     "Seçim Yapılmadı",
     "Ev Sahibi 1.5 Üst",
@@ -132,11 +172,11 @@ matches = [
     }
 ]
 
-tab1, tab2 = st.tabs(["🎯 Canlı İstişare & Maç Masası", "🔬 Vaka Analizi & Öğrenme"])
+tab1, tab2 = st.tabs(["🎯 Canlı İstişare Masası", "🔬 Vaka Analizi & Öğrenme"])
 
 with tab1:
     st.markdown("### 📋 Günün Bülteni & Canlı İstişare")
-    st.caption("🔒 Kural: Tercihini ve oranını kilitle, ardından model raporunu açıp maç altındaki canlı sohbetle tartış.")
+    st.markdown("<p style='color:#94a3b8; font-size:13px;'>🔒 <b>Kural:</b> Tercihini ve oranını kilitle, ardından model raporunu açıp maç altındaki canlı sohbetle tartış.</p>", unsafe_allow_html=True)
 
     current_session = ""
     for m in matches:
@@ -144,15 +184,15 @@ with tab1:
         
         if m["session"] != current_session:
             current_session = m["session"]
-            st.markdown(f"<div style='margin-top:20px; margin-bottom:10px;'><span class='badge-session'>{current_session}</span></div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='margin-top:22px; margin-bottom:10px;'><span class='badge-session'>{current_session}</span></div>", unsafe_allow_html=True)
 
         st.markdown(f"""
         <div class="match-card">
-            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
                 <span class="badge-tier">{m['league']}</span>
-                <span style="color:#94a3b8; font-size:12px;">{m['time']}</span>
+                <span style="color:#cbd5e1; font-size:12px; font-weight:600;">{m['time']}</span>
             </div>
-            <h4 style="margin:2px 0 0 0; color:#ffffff;">{m['match']}</h4>
+            <h3 style="margin:2px 0 0 0; color:#ffffff; font-size:17px;">{m['match']}</h3>
         </div>
         """, unsafe_allow_html=True)
         
@@ -178,9 +218,11 @@ with tab1:
         # Model Raporu Alanı
         if st.session_state.revealed.get(m_id, False):
             st.markdown(f"""
-            <div style="background:#0f172a; border:1px solid #334155; padding:10px; border-radius:6px; margin-top:8px;">
-                <b>🤖 Model Sinyali:</b> <span style="color:#38bdf8; font-weight:bold;">{m['model_market']}</span><br>
-                <small style="color:#94a3b8;">xG: {m['model_xg']} | Güven: {m['confidence']} | Skor Projeksiyonu: {m['score_pred']}</small>
+            <div style="background:#111827; border:1px solid #374151; padding:12px; border-radius:8px; margin-top:8px;">
+                <b style="color:#ffffff;">🤖 Model Sinyali:</b> <span style="color:#38bdf8; font-weight:bold; font-size:15px;">{m['model_market']}</span><br>
+                <div style="color:#cbd5e1; font-size:12px; margin-top:4px;">
+                    <b>xG Projeksiyonu:</b> {m['model_xg']} &nbsp;|&nbsp; <b>Güven:</b> {m['confidence']} &nbsp;|&nbsp; <b>Skor:</b> {m['score_pred']}
+                </div>
             </div>
             """, unsafe_allow_html=True)
             
@@ -191,12 +233,12 @@ with tab1:
                 is_match = u_text in m_text or m_text in u_text
                 
                 status_color = "#22c55e" if is_match else "#eab308"
-                status_label = "🟢 Tam Mutabakat" if is_match else "🟡 Ayrışma / İstişare Gerekli"
+                status_label = "🟢 Tam Mutabakat (Ortak Karar)" if is_match else "🟡 Ayrışma / İstişare Masası"
                 
                 st.markdown(f"""
-                <div style="margin-top:6px; padding:6px 10px; border-radius:4px; background:{status_color}18; border-left:3px solid {status_color};">
-                    <span style="color:{status_color}; font-weight:bold; font-size:12px;">{status_label}</span><br>
-                    <small>Sen: <b>{saved_choice} (@{st.session_state.user_odds.get(m_id, '-')})</b> | Model: <b>{m['model_market']}</b></small>
+                <div style="margin-top:8px; padding:8px 12px; border-radius:6px; background:{status_color}1a; border-left:4px solid {status_color};">
+                    <span style="color:{status_color}; font-weight:bold; font-size:13px;">{status_label}</span><br>
+                    <small style="color:#f3f4f6;">Sen: <b>{saved_choice} (@{st.session_state.user_odds.get(m_id, '-')})</b> &nbsp;|&nbsp; Model: <b>{m['model_market']}</b></small>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -204,24 +246,23 @@ with tab1:
         with st.expander("📊 Canlı Saha & İstatistik Masası (Mackolik Girişi)"):
             c_stat1, c_stat2, c_stat3 = st.columns(3)
             with c_stat1:
-                cur_min = st.text_input("Dakika:", key=f"min_{m_id}", placeholder="Örn: 34'")
+                st.text_input("Dakika:", key=f"min_{m_id}", placeholder="Örn: 34'")
             with c_stat2:
-                cur_score = st.text_input("Canlı Skor:", key=f"score_{m_id}", placeholder="Örn: 1-0")
+                st.text_input("Canlı Skor:", key=f"score_{m_id}", placeholder="Örn: 1-0")
             with c_stat3:
-                cur_poss = st.text_input("Topla Oynama (%):", key=f"poss_{m_id}", placeholder="Örn: 58 - 42")
+                st.text_input("Topla Oynama (%):", key=f"poss_{m_id}", placeholder="Örn: 58 - 42")
             
             c_xg1, c_xg2 = st.columns(2)
             with c_xg1:
-                cur_xg_home = st.number_input("Ev Canlı xG:", min_value=0.0, max_value=10.0, step=0.05, key=f"xgh_{m_id}")
+                st.number_input("Ev Canlı xG:", min_value=0.0, max_value=10.0, step=0.05, key=f"xgh_{m_id}")
             with c_xg2:
-                cur_xg_away = st.number_input("Dep Canlı xG:", min_value=0.0, max_value=10.0, step=0.05, key=f"xga_{m_id}")
+                st.number_input("Dep Canlı xG:", min_value=0.0, max_value=10.0, step=0.05, key=f"xga_{m_id}")
 
-        # 3. Maça Özel Canlı Sohbet & İstişare Odası
+        # 3. Maça Özel Canlı Sohbet
         with st.expander("💬 Bu Maç İçin Canlı Tartışma / Sohbet"):
             if m_id not in st.session_state.chat_logs:
                 st.session_state.chat_logs[m_id] = []
             
-            # Mesaj Akışı
             for chat in st.session_state.chat_logs[m_id]:
                 st.markdown(f"""
                 <div class="chat-bubble-user">
@@ -229,10 +270,9 @@ with tab1:
                 </div>
                 """, unsafe_allow_html=True)
             
-            # Yeni Mesaj Gönderme
             col_msg, col_send = st.columns([3, 1])
             with col_msg:
-                user_msg = st.text_input("Taktiksel Görüşünü Yaz:", key=f"chat_in_{m_id}", placeholder="Örn: Ev sahibi baskıyı kurdu, ilk yarı gol gelir...")
+                user_msg = st.text_input("Taktiksel Görüşünü Yaz:", key=f"chat_in_{m_id}", placeholder="Örn: Baskı çok arttı, gol an meselesi...")
             with col_send:
                 if st.button("Gönder 💬", key=f"send_chat_{m_id}"):
                     if user_msg.strip():
@@ -244,6 +284,7 @@ with tab1:
 
 with tab2:
     st.markdown("### 📚 Biten Maç Vaka Analizi")
+    st.markdown("<p style='color:#94a3b8; font-size:13px;'>Biten maçların sonucunu ve taktiksel nedenlerini kaydederek model hafızasını besle.</p>", unsafe_allow_html=True)
     
     col_a, col_b = st.columns(2)
     with col_a:
@@ -251,7 +292,7 @@ with tab2:
         v_source = st.selectbox("Tercih Kaynağı:", ["İnsan Sezgisi", "Model Sinyali", "Ortak Konsensüs"])
     with col_b:
         v_res = st.selectbox("Sonuç:", ["Başarılı", "Başarısız"])
-        v_note = st.text_area("Taktiksel Çıkarım / Not:", placeholder="Örn: Erken gol tempoyu artırdı, deplasman direnci düştü...")
+        v_note = st.text_area("Taktiksel Çıkarım / Not:", placeholder="Örn: Erken gol tempoyu artırdı...")
 
     if st.button("Vakayı Sisteme Kaydet 💾"):
         if v_match:
@@ -266,8 +307,8 @@ with tab2:
         for c in reversed(st.session_state.cases):
             color = "#22c55e" if c['res'] == "Başarılı" else "#ef4444"
             st.markdown(f"""
-            <div style="background:#1e293b; border-left:4px solid {color}; padding:8px 12px; border-radius:6px; margin-bottom:8px;">
-                <b>{c['match']}</b> — <span style="color:{color}; font-weight:bold;">{c['res']}</span> ({c['source']})<br>
-                <small style="color:#cbd5e1;">{c['note']}</small>
+            <div style="background:#1f2937; border-left:4px solid {color}; padding:10px 14px; border-radius:6px; margin-bottom:8px; border-top:1px solid #374151; border-right:1px solid #374151; border-bottom:1px solid #374151;">
+                <b style="color:#ffffff;">{c['match']}</b> — <span style="color:{color}; font-weight:bold;">{c['res']}</span> <span style="color:#94a3b8;">({c['source']})</span><br>
+                <small style="color:#cbd5e1; display:inline-block; margin-top:4px;">{c['note']}</small>
             </div>
             """, unsafe_allow_html=True)

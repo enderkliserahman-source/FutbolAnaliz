@@ -7,7 +7,6 @@ st.set_page_config(layout="centered", initial_sidebar_state="collapsed", page_ti
 
 DB_FILE = "database.json"
 
-# Kalıcı Veritabanı Fonksiyonları
 def load_data():
     if os.path.exists(DB_FILE):
         try:
@@ -51,7 +50,7 @@ tab1, tab2 = st.tabs(["🎯 Canlı İstişare Masası", "🔬 Vaka Analizi & Ö�
 
 with tab1:
     st.markdown("<h2 style='color:#ffffff; margin:0;'>📋 Günün Bülteni & Analiz Masası</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='color:#94a3b8; font-size:13px; margin-bottom:15px;'>🔒 Tercihini kilitleyip model raporunu aç; veriler otomatik olarak diskte saklanır.</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#94a3b8; font-size:13px; margin-bottom:15px;'>🔒 <b>Kural:</b> Önce tahminini seçip kilitlemelisin. Kilitlenmeyen maçın model raporu açılamaz.</p>", unsafe_allow_html=True)
 
     current_session = ""
     for m in matches:
@@ -84,18 +83,30 @@ with tab1:
         c1, c2 = st.columns(2)
         with c1:
             if st.button("Tahminimi Kilitle 🔒", key=f"save_{m_id}"):
-                data["user_preds"][m_id] = user_choice
-                data["user_odds"][m_id] = user_odd
-                save_data(data)
-                st.toast("Diske kaydedildi!")
+                if user_choice == "Seçim Yapılmadı":
+                    st.warning("Lütfen önce geçerli bir tercih seçin!")
+                else:
+                    data["user_preds"][m_id] = user_choice
+                    data["user_odds"][m_id] = user_odd
+                    save_data(data)
+                    st.toast("Tahminin diske mühürlendi!")
+                    st.rerun()
         with c2:
             if st.button("Model Raporunu Aç 📊", key=f"rev_{m_id}"):
-                data["revealed"][m_id] = True
-                save_data(data)
-                st.rerun()
+                # KİLİT KONTROLÜ: Kullanıcı henüz geçerli bir tahmin kaydetmediyse engelle
+                current_locked = data["user_preds"].get(m_id, "Seçim Yapılmadı")
+                if current_locked == "Seçim Yapılmadı":
+                    st.error("⚠️ Önce kendi tahmininizi seçip kilitlemelisiniz!")
+                else:
+                    data["revealed"][m_id] = True
+                    save_data(data)
+                    st.rerun()
 
-        # Model Raporu
-        if data["revealed"].get(m_id, False):
+        # Model Raporu Alanı (Sadece Kilitliyse ve Butona Basıldıysa)
+        is_revealed = data["revealed"].get(m_id, False)
+        locked_choice = data["user_preds"].get(m_id, "Seçim Yapılmadı")
+
+        if is_revealed and locked_choice != "Seçim Yapılmadı":
             st.markdown(f"""
             <div style="background:#090d16; border:1px solid #334155; padding:10px; border-radius:6px; margin-top:6px;">
                 <b style="color:#ffffff;">🤖 Model Sinyali:</b> <span style="color:#38bdf8; font-weight:bold; font-size:15px;">{m['model_market']}</span><br>
@@ -105,18 +116,16 @@ with tab1:
             </div>
             """, unsafe_allow_html=True)
             
-            cur_p = data["user_preds"].get(m_id, "Seçim Yapılmadı")
-            if cur_p != "Seçim Yapılmadı":
-                is_match = cur_p.lower() in m['model_market'].lower() or m['model_market'].lower() in cur_p.lower()
-                status_color = "#22c55e" if is_match else "#eab308"
-                status_label = "🟢 Tam Mutabakat (Ortak Karar)" if is_match else "🟡 İstişare Gerekli"
-                
-                st.markdown(f"""
-                <div style="margin-top:6px; padding:6px 10px; border-radius:4px; background:{status_color}22; border-left:4px solid {status_color};">
-                    <span style="color:{status_color}; font-weight:bold; font-size:12px;">{status_label}</span><br>
-                    <small style="color:#ffffff;">Sen: <b>{cur_p} (@{data['user_odds'].get(m_id, '-')})</b> &nbsp;|&nbsp; Model: <b>{m['model_market']}</b></small>
-                </div>
-                """, unsafe_allow_html=True)
+            is_match = locked_choice.lower() in m['model_market'].lower() or m['model_market'].lower() in locked_choice.lower()
+            status_color = "#22c55e" if is_match else "#eab308"
+            status_label = "🟢 Tam Mutabakat (Ortak Karar)" if is_match else "🟡 İstişare Gerekli"
+            
+            st.markdown(f"""
+            <div style="margin-top:6px; padding:6px 10px; border-radius:4px; background:{status_color}22; border-left:4px solid {status_color};">
+                <span style="color:{status_color}; font-weight:bold; font-size:12px;">{status_label}</span><br>
+                <small style="color:#ffffff;">Sen: <b>{locked_choice} (@{data['user_odds'].get(m_id, '-')})</b> &nbsp;|&nbsp; Model: <b>{m['model_market']}</b></small>
+            </div>
+            """, unsafe_allow_html=True)
 
         # Canlı Tartışma Odası
         with st.expander("💬 Bu Maç İçin Canlı Tartışma"):

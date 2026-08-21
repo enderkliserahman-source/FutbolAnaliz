@@ -1,10 +1,14 @@
 import streamlit as st
+from datetime import datetime
 
-st.set_page_config(layout="centered", initial_sidebar_state="collapsed", page_title="Futbol Analiz Masası")
+st.set_page_config(layout="centered", initial_sidebar_state="collapsed", page_title="Futbol İstişare & Analiz Masası")
 
+# Session State Başlatma
 if "user_preds" not in st.session_state: st.session_state.user_preds = {}
 if "user_odds" not in st.session_state: st.session_state.user_odds = {}
 if "revealed" not in st.session_state: st.session_state.revealed = {}
+if "chat_logs" not in st.session_state: st.session_state.chat_logs = {}
+if "live_stats" not in st.session_state: st.session_state.live_stats = {}
 if "cases" not in st.session_state: st.session_state.cases = []
 
 st.markdown("""
@@ -19,9 +23,9 @@ st.markdown("""
         border-left: 4px solid #38bdf8;
         padding: 12px 14px;
         border-radius: 8px;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
     }
-    .badge-session { background: #3b82f6; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+    .badge-session { background: #3b82f6; color: white; padding: 3px 9px; border-radius: 4px; font-size: 12px; font-weight: bold; }
     .badge-tier { background: #0284c7; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; }
     
     div[data-baseweb="select"] { background-color: #334155 !important; border-radius: 6px; }
@@ -35,10 +39,26 @@ st.markdown("""
         border-radius: 6px !important;
         width: 100% !important;
     }
+    .chat-bubble-user {
+        background: #1e3a8a;
+        padding: 8px 12px;
+        border-radius: 8px 8px 0px 8px;
+        margin-bottom: 6px;
+        font-size: 13px;
+        border: 1px solid #3b82f6;
+    }
+    .chat-bubble-system {
+        background: #1e293b;
+        padding: 8px 12px;
+        border-radius: 8px 8px 8px 0px;
+        margin-bottom: 6px;
+        font-size: 13px;
+        border-left: 3px solid #38bdf8;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# HAZIR TAHMİN SEÇENEKLERİ (SADECE POZİTİF GOL MARKETLERİ)
+# HAZIR TAHMİN SEÇENEKLERİ
 PRESET_OPTIONS = [
     "Seçim Yapılmadı",
     "Ev Sahibi 1.5 Üst",
@@ -51,7 +71,7 @@ PRESET_OPTIONS = [
     "Ev Sahibi 2.5 Üst"
 ]
 
-# 21 AĞUSTOS 2026 - GÜNCEL BÜLTEN
+# 21 AĞUSTOS 2026 - BÜLTEN HAVUZU
 matches = [
     # GÜNDÜZ SEANSI
     {
@@ -66,7 +86,6 @@ matches = [
         "model_market": "2.5 Üst & KG Var", "model_xg": "1.68 - 1.15",
         "confidence": "%72", "score_pred": "2-1 / 1-2"
     },
-    
     # AKŞAM ERKEN SEANS
     {
         "id": 3, "session": "Akşam Erken Seans", "time": "20:30", "league": "Avusturya Bundesliga",
@@ -86,7 +105,6 @@ matches = [
         "model_market": "Ev Sahibi 1.5 Üst & KG Var", "model_xg": "1.80 - 1.20",
         "confidence": "%69", "score_pred": "2-1"
     },
-    
     # GECE ANA SEANSI
     {
         "id": 6, "session": "Gece Ana Seansı", "time": "21:45", "league": "Fransa Ligue 1",
@@ -114,11 +132,11 @@ matches = [
     }
 ]
 
-tab1, tab2 = st.tabs(["🎯 Canlı İstişare Masası", "🔬 Vaka Analizi & Öğrenme"])
+tab1, tab2 = st.tabs(["🎯 Canlı İstişare & Maç Masası", "🔬 Vaka Analizi & Öğrenme"])
 
 with tab1:
-    st.markdown("### 📋 Günün Bülteni & Analiz Masası")
-    st.caption("🔒 Kural: Açılır listeden tahminini ve oranını seçip kilitle. Ardından model raporunu aç.")
+    st.markdown("### 📋 Günün Bülteni & Canlı İstişare")
+    st.caption("🔒 Kural: Tercihini ve oranını kilitle, ardından model raporunu açıp maç altındaki canlı sohbetle tartış.")
 
     current_session = ""
     for m in matches:
@@ -126,7 +144,7 @@ with tab1:
         
         if m["session"] != current_session:
             current_session = m["session"]
-            st.markdown(f"<div style='margin-top:18px; margin-bottom:8px;'><span class='badge-session'>{current_session}</span></div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='margin-top:20px; margin-bottom:10px;'><span class='badge-session'>{current_session}</span></div>", unsafe_allow_html=True)
 
         st.markdown(f"""
         <div class="match-card">
@@ -138,7 +156,7 @@ with tab1:
         </div>
         """, unsafe_allow_html=True)
         
-        # Açılır Liste & Oran Alanı
+        # 1. Tahmin ve Oran Seçimi
         col_sel, col_odd = st.columns([2, 1])
         with col_sel:
             current_choice = st.session_state.user_preds.get(m_id, "Seçim Yapılmadı")
@@ -157,7 +175,7 @@ with tab1:
             if st.button("Model Raporunu Aç 📊", key=f"rev_{m_id}"):
                 st.session_state.revealed[m_id] = True
 
-        # Model Raporu (Sadece butona basınca)
+        # Model Raporu Alanı
         if st.session_state.revealed.get(m_id, False):
             st.markdown(f"""
             <div style="background:#0f172a; border:1px solid #334155; padding:10px; border-radius:6px; margin-top:8px;">
@@ -182,6 +200,46 @@ with tab1:
                 </div>
                 """, unsafe_allow_html=True)
 
+        # 2. Canlı Maçkolik & Saha İstatistik Paneli
+        with st.expander("📊 Canlı Saha & İstatistik Masası (Mackolik Girişi)"):
+            c_stat1, c_stat2, c_stat3 = st.columns(3)
+            with c_stat1:
+                cur_min = st.text_input("Dakika:", key=f"min_{m_id}", placeholder="Örn: 34'")
+            with c_stat2:
+                cur_score = st.text_input("Canlı Skor:", key=f"score_{m_id}", placeholder="Örn: 1-0")
+            with c_stat3:
+                cur_poss = st.text_input("Topla Oynama (%):", key=f"poss_{m_id}", placeholder="Örn: 58 - 42")
+            
+            c_xg1, c_xg2 = st.columns(2)
+            with c_xg1:
+                cur_xg_home = st.number_input("Ev Canlı xG:", min_value=0.0, max_value=10.0, step=0.05, key=f"xgh_{m_id}")
+            with c_xg2:
+                cur_xg_away = st.number_input("Dep Canlı xG:", min_value=0.0, max_value=10.0, step=0.05, key=f"xga_{m_id}")
+
+        # 3. Maça Özel Canlı Sohbet & İstişare Odası
+        with st.expander("💬 Bu Maç İçin Canlı Tartışma / Sohbet"):
+            if m_id not in st.session_state.chat_logs:
+                st.session_state.chat_logs[m_id] = []
+            
+            # Mesaj Akışı
+            for chat in st.session_state.chat_logs[m_id]:
+                st.markdown(f"""
+                <div class="chat-bubble-user">
+                    <b>Sen ({chat['time']}):</b> {chat['msg']}
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # Yeni Mesaj Gönderme
+            col_msg, col_send = st.columns([3, 1])
+            with col_msg:
+                user_msg = st.text_input("Taktiksel Görüşünü Yaz:", key=f"chat_in_{m_id}", placeholder="Örn: Ev sahibi baskıyı kurdu, ilk yarı gol gelir...")
+            with col_send:
+                if st.button("Gönder 💬", key=f"send_chat_{m_id}"):
+                    if user_msg.strip():
+                        now_str = datetime.now().strftime("%H:%M")
+                        st.session_state.chat_logs[m_id].append({"time": now_str, "msg": user_msg})
+                        st.rerun()
+
         st.divider()
 
 with tab2:
@@ -193,7 +251,7 @@ with tab2:
         v_source = st.selectbox("Tercih Kaynağı:", ["İnsan Sezgisi", "Model Sinyali", "Ortak Konsensüs"])
     with col_b:
         v_res = st.selectbox("Sonuç:", ["Başarılı", "Başarısız"])
-        v_note = st.text_area("Taktiksel Çıkarım / Not:", placeholder="Örn: Erken gol tempoyu artırdı...")
+        v_note = st.text_area("Taktiksel Çıkarım / Not:", placeholder="Örn: Erken gol tempoyu artırdı, deplasman direnci düştü...")
 
     if st.button("Vakayı Sisteme Kaydet 💾"):
         if v_match:
